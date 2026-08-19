@@ -1,8 +1,5 @@
 name: بناء APK للتطبيق
 
-# متى يعمل هذا السكريبت تلقائياً:
-# - عند رفع (push) أي تعديل إلى فرع main
-# - يمكن أيضاً تشغيله يدوياً من تبويب Actions بالضغط على "Run workflow"
 on:
   push:
     branches: [main]
@@ -17,54 +14,69 @@ jobs:
       - name: تنزيل الكود من المستودع
         uses: actions/checkout@v4
 
-      - name: تثبيت Java (مطلوب لبناء أندرويد)
+      - name: تثبيت Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: تثبيت Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
-          channel: 'stable'
+          channel: stable
           cache: true
 
-      # إن كان مجلد android غير موجود في المستودع (كود مصدري فقط)
-      # هذه الخطوة تولّده تلقائياً قبل البناء
-      - name: توليد ملفات المنصة (android) إن لم تكن موجودة
+      - name: التأكد من مشروع Flutter
+        working-directory: phone_repair_manager
+        run: |
+          echo "Project directory:"
+          pwd
+          echo "pubspec.yaml:"
+          grep '^name:' pubspec.yaml
+          echo "Flutter version:"
+          flutter --version
+
+      - name: توليد Android إذا لم يكن موجوداً
+        working-directory: phone_repair_manager
         run: |
           if [ ! -d "android" ]; then
             flutter create --platforms=android --org com.repairshop .
           fi
 
-      - name: تنزيل المكتبات (pub get)
+      - name: تنزيل المكتبات
+        working-directory: phone_repair_manager
         run: flutter pub get
 
-      - name: فحص الكود (اختياري، لا يوقف البناء عند وجود تحذيرات بسيطة)
+      - name: فحص اسم الحزمة
+        working-directory: phone_repair_manager
+        run: |
+          echo "Package name:"
+          grep '^name:' pubspec.yaml
+          test "$(grep '^name:' pubspec.yaml | awk '{print $2}')" = "hakim_app"
+
+      - name: فحص الكود
+        working-directory: phone_repair_manager
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
-      - name: بناء ملف APK (نسخة release)
+      - name: بناء APK Release
+        working-directory: phone_repair_manager
         run: flutter build apk --release
 
-      # رفع الملف الناتج كـ "Artifact" يمكن تنزيله من صفحة الـ Run نفسها
-      - name: رفع ملف APK كمرفق قابل للتنزيل
+      - name: رفع APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: phone_repair_manager/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-      # إنشاء إصدار (Release) رسمي على GitHub يحتوي رابط تحميل مباشر
-      # يعمل فقط عند الرفع إلى main (وليس عند التشغيل اليدوي)
-      - name: إنشاء إصدار (Release) برقم تسلسلي وإرفاق APK به
+      - name: إنشاء Release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: "إصدار تلقائي #${{ github.run_number }}"
           body: "بُني تلقائياً من الكوميت ${{ github.sha }}"
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: phone_repair_manager/build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

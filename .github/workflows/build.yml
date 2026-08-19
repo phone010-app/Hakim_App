@@ -27,22 +27,17 @@ jobs:
           channel: stable
           cache: true
 
-      - name: التأكد من مشروع Flutter
-        working-directory: phone_repair_manager
-        run: |
-          echo "Project directory:"
-          pwd
-          echo "pubspec.yaml:"
-          grep '^name:' pubspec.yaml
-          echo "Flutter version:"
-          flutter --version
-
       - name: توليد Android إذا لم يكن موجوداً
         working-directory: phone_repair_manager
         run: |
           if [ ! -d "android" ]; then
             flutter create --platforms=android --org com.repairshop .
           fi
+
+      - name: ضبط إصدار Kotlin
+        working-directory: phone_repair_manager
+        run: |
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*" apply false/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/' android/settings.gradle
 
       - name: تنزيل المكتبات
         working-directory: phone_repair_manager
